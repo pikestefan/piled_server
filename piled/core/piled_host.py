@@ -9,6 +9,7 @@ Created on Sat Feb 18 10:22:31 2023
 import socket
 from PyQt5.QtCore import QThread, QObject, QCoreApplication, pyqtSignal
 
+
 class ThreadedQObject(QObject):
     
     def __init__(self, threadname = None, *args, **kwargs):
@@ -28,8 +29,15 @@ class ThreadedQObject(QObject):
         self._thread.exit()
         while not self._thread.isFinished():
             pass
-        print(f"Thread {self.threadname} now closed")
+        print(f"Thread {self.threadname} now closed.")
         self._thread = None
+        
+    def isFinished(self):
+        if self._thread is None:
+            return True
+        else:
+            return self._thread.isFinished()
+        
 
 class LEDServer(ThreadedQObject):
     def __init__(self, threadname, *args, **kwargs):
@@ -67,19 +75,27 @@ class LEDServer(ThreadedQObject):
         return IP
     
     def remove_connection(self, ip):
-        connection = self.connection_dictionary[ip]
-        connection.stop()
-        self.connection_dictionary.pop(ip)
+        if ip in self.connection_dictionary:
+            self.connection_dictionary[ip].stop()
+            self.connection_dictionary.pop(ip)
+        else:
+            print("Something went wrong. The IP {} is not stored in the "
+                  "dictionary of open connections.")
         
     
     def add_connection(self, connection, ipaddress):
-        open_connections = len(self.connection_dictionary)
-        conn = ServerConnection(f"thread_{open_connections}",
-                                connection,
-                                ipaddress)
-        conn.sig_ConnectionClosed.connect(self.remove_connection)
-        self.connection_dictionary[ipaddress] = conn
-        conn.sig_startListening.emit()
+        if ipaddress in self.connection_dictionary:
+            print(f"IP {ipaddress} is already connected with the host."
+                  "Please close that connection first.")
+        else: 
+            open_connections = len(self.connection_dictionary)
+            conn = ServerConnection(f"thread_{open_connections}",
+                                    connection,
+                                    ipaddress)
+            conn.sig_ConnectionClosed.connect(self.remove_connection)
+            self.connection_dictionary[ipaddress] = conn
+            print("Connected to", ipaddress)
+            conn.sig_startListening.emit()
         
     
 class ServerListener(ThreadedQObject):
@@ -96,15 +112,13 @@ class ServerListener(ThreadedQObject):
         
     def start_listening(self):
         
-        print("Started listening")
+        print("Started listening for new connections requests.")
         self.socket_conn.listen()
         conn, address = self.socket_conn.accept()
         ip, _ = address
         
         try:
             conn.sendall(b"1")
-            
-            print("Connected to", ip)
             self.sig_ConnectionSuccess.emit(conn, ip)
         except:
             print(f"Sending a message to {ip} has failed.")
@@ -125,17 +139,31 @@ class ServerConnection(ThreadedQObject):
         self.sig_startListening.connect(self.receive_messages)
         
     def receive_messages(self):
-        message = self.connection.recv(2048)
-        message = message.decode().strip()
+        try:
+            message = self.connection.recv(2048)
+            message = message.decode().strip()
+        except:
+            print("The client aborted the communication.")
+            self.sig_ConnectionClosed.emit(self.ip)
         if message == "-1":
             self.connection_shutdown()
         else:
-            self.connection.sendall(b"0")
-            self.sig_MessageRcvd.emit(message)
-            self.sig_startListening.emit()
+            try:
+                self.connection.sendall(b"0")
+                self.sig_MessageRcvd.emit(message)
+                self.sig_startListening.emit()
+            except:
+                print("Could not send reply message to the client, or the "
+                      "client aborted the connection. "
+                      "Its connection will now be closed.")
+                self.connection_shutdown()
                 
-    def connection_shutdown(self):
-        self.connection.sendall(b"-1")
+    def connection_shutdown(self, silence_signal=False):
+        print(f"Closing the communication with IP: {self.ip}.")
+        try:
+            self.connection.sendall(b"-1")
+        except:
+            print("Could not send the connection shutdown message. Closing anyway.")
         self.connection.close()
         self.sig_ConnectionClosed.emit(self.ip)
         
