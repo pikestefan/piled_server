@@ -7,9 +7,7 @@ Created on Sat Feb 18 10:22:31 2023
 """
 
 import socket
-from time import sleep
-from PyQt5.QtCore import QThread, QObject, QCoreApplication, pyqtSignal, Qt, pyqtSlot
-from numpy.random import randint
+from PyQt5.QtCore import QThread, QObject, QCoreApplication, pyqtSignal
 
 class ThreadedQObject(QObject):
     
@@ -134,7 +132,6 @@ class ServerConnection(ThreadedQObject):
         else:
             self.connection.sendall(b"0")
             self.sig_MessageRcvd.emit(message)
-            print(message)
             self.sig_startListening.emit()
                 
     def connection_shutdown(self):
