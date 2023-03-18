@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 
-class PILedClient(socket.socket):
+class PILedClient:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -21,44 +21,27 @@ class PILedClient(socket.socket):
 
         self.host_ip = configs["host_ip"]
         self.host_port = configs["host_port"]
-        timeout = configs["default_timeout"]
-
-        self.settimeout(timeout)
-
-        try:
-            self.connect((self.host_ip, self.host_port))
-        except:
-            print(
-                "Unable to connect to host ip: {}, with port: {}.".format(
-                    self.host_ip, self.host_port
-                )
-            )
-
-    def close_connection(self):
-        self.sendread("-1")
-
-    def connect(self, address):
-        super().connect(address)
-        try:
-            self.recv(2048).decode()
-        except:
-            print("Could not receive the handshake message from the host.")
+        self.timeout = configs["default_timeout"]
 
     def sendread(self, message):
-        try:
-            self.sendall(message.encode("utf-8"))
-            reply = self.recv(2048).decode()
-            if reply == "-1":
-                self.close()
-        except:
-            print(
-                "Write/read operation has not succeded. Check that the device"
-                " at ip {}, port: {}, is still available."
-                " The current connection will be closed.".format(
-                    self.host_ip, self.host_port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(self.timeout)
+            sock.connect((self.host_ip, self.host_port))
+            try:
+                sock.sendall(message.encode("utf-8"))
+                reply = sock.recv(2048).decode()
+                if reply == "0":
+                    print("The host replied.")
+                else:
+                    print("Message has been sent but not reply from host.")
+            except:
+                print(
+                    "Write/read operation has not succeded. Check that the device"
+                    " at ip {}, port: {}, is still available."
+                    " The current connection will be closed.".format(
+                        self.host_ip, self.host_port
+                    )
                 )
-            )
-            self.close()
 
 
 he = PILedClient()
