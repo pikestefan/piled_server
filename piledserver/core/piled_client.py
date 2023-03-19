@@ -23,15 +23,23 @@ class PILedClient:
         self.host_port = configs["host_port"]
         self.timeout = configs["default_timeout"]
 
+    def send_poscolor(self, pos, r, g, b):
+        message = f"{pos},{g},{r},{b}"
+        retval = self.sendread(message)
+        return retval
+
     def sendread(self, message):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(self.timeout)
-            sock.connect((self.host_ip, self.host_port))
+            try:
+                sock.connect((self.host_ip, self.host_port))
+            except:
+                return -1
             try:
                 sock.sendall(message.encode("utf-8"))
                 reply = sock.recv(2048).decode()
                 if reply == "0":
-                    print("The host replied.")
+                    pass
                 else:
                     print("Message has been sent but not reply from host.")
             except:
@@ -42,6 +50,5 @@ class PILedClient:
                         self.host_ip, self.host_port
                     )
                 )
-
-
-he = PILedClient()
+                return -1
+        return 0
