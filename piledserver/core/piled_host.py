@@ -16,6 +16,10 @@ from PyQt5.QtCore import pyqtSignal, Qt
 
 
 class LEDServer(ThreadedQObject):
+    
+    #TODO: need to handle the exceptions when the arduino is unable to connect
+    # Also when the message is in the incorrect format (i.e. not #,#)
+    
     def __init__(self, threadname, logger=None, *args, **kwargs):
         super().__init__(threadname, logger, *args, **kwargs)
 
